@@ -1,6 +1,7 @@
 require 'openssl'
 require 'openssl-extensions/all'
 require 'digest/sha1'
+require 'sslshake'
 
 module Yawast
   module Scanner
@@ -93,7 +94,7 @@ module Yawast
           puts ''
 
           if check_ciphers
-            get_ciphers(uri)
+            get_ciphers_sslshake(uri)
           end
 
           ssl.sysclose
@@ -101,6 +102,45 @@ module Yawast
           get_tdes_session_msg_count(uri) if tdes_session_count
         rescue => e
           Yawast::Utilities.puts_error "SSL: Error Reading X509 Details: #{e.message}"
+        end
+      end
+
+      def self.get_ciphers_sslshake(uri)
+        puts 'Supported Ciphers:'
+
+        dns = Resolv::DNS.new
+
+        if IPAddress.valid? uri.host
+          ip = IPAddress.parse uri.host
+        else
+          ip = dns.getaddresses(uri.host)[0]
+        end
+
+        protocols = %w(ssl2 ssl3 tls1.0 tls1.1 tls1.2)
+
+        protocols.each do |protocol|
+          case protocol
+            when 'ssl2'
+              ciphers = SSLShake::SSLv2::CIPHERS
+            when 'ssl3'
+              ciphers = SSLShake::TLS::SSL3_CIPHERS
+            else
+              ciphers = SSLShake::TLS::TLS_CIPHERS
+          end
+
+          puts "\tChecking for #{protocol} suites (#{ciphers.count} possible suites)"
+
+          ciphers.each_key do |cipher|
+            begin
+              res = SSLShake.hello(ip.to_s, port: uri.port, protocol: protocol, ciphers: cipher)
+
+              if res['error'] == nil
+                Yawast::Utilities.puts_info "\t\tCipher: #{res['cipher_suite']}"
+              end
+            rescue => e
+              Yawast::Utilities.puts_error "SSL: Error Reading Cipher Details: #{e.message}"
+            end
+          end
         end
       end
 
