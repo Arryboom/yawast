@@ -132,7 +132,7 @@ module Yawast
 
           ciphers.each_key do |cipher|
             begin
-              res = SSLShake.hello(ip.to_s, port: uri.port, protocol: protocol, ciphers: cipher)
+              res = SSLShake.hello(ip.to_s, port: uri.port, protocol: protocol, ciphers: cipher, servername: uri.host)
 
               if res['error'] == nil
                 Yawast::Utilities.puts_info "\t\tCipher: #{res['cipher_suite']}"
